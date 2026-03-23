@@ -1,101 +1,44 @@
 import discord
 from discord.ext import commands
 import aiohttp
-from bs4 import BeautifulSoup
-import asyncio
+import os
 
-# ============================================================
-#  BOT AYARLARI - Buraya kendi token'ını yaz
-# ============================================================
-TOKEN = "BURAYA_BOT_TOKENINI_YAZ"
+TOKEN = os.environ.get("TOKEN")
 PREFIX = "!"
-# ============================================================
 
 intents = discord.Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
-async def altin_fiyatlari_cek():
-    """Altın fiyatlarını bigpara.com'dan çeker."""
-    url = "https://bigpara.hurriyet.com.tr/altin/"
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        )
-    }
 
+async def altin_fiyatlari_cek():
+    url = "https://finans.truncgil.com/today.json"
     async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as resp:
+        async with session.get(url) as resp:
             if resp.status != 200:
                 return None
-            html = await resp.text()
-
-    soup = BeautifulSoup(html, "html.parser")
+            veri = await resp.json(content_type=None)
 
     hedefler = {
-        "Gram Altın":       "ALTIN",
-        "Çeyrek Altın":     "CEYREK_ALTIN",
-        "Yarım Altın":      "YARIM_ALTIN",
-        "Tam Altın":        "TAM_ALTIN",
-        "Altın ONS (USD)":  "ALTIN_ONS",
+        "Gram Altın":      "gram-altin",
+        "Çeyrek Altın":    "ceyrek-altin",
+        "Yarım Altın":     "yarim-altin",
+        "Tam Altın":       "tam-altin",
+        "Altın ONS (USD)": "altin-ons",
     }
 
     sonuclar = {}
-
-    satirlar = soup.select("tr")
-    for satir in satirlar:
-        hucreler = satir.find_all("td")
-        if len(hucreler) < 4:
-            continue
-        ad = hucreler[0].get_text(strip=True)
-        for gosterim_adi, anahtar in hedefler.items():
-            if anahtar in ad.upper().replace(" ", "_").replace("Ç", "C").replace("Ş", "S").replace("Ğ", "G").replace("İ", "I").replace("Ö", "O").replace("Ü", "U") or gosterim_adi.upper() in ad.upper():
-                alis  = hucreler[1].get_text(strip=True)
-                satis = hucreler[2].get_text(strip=True)
-                sonuclar[gosterim_adi] = {"alis": alis, "satis": satis}
-
-    # Eğer scraping çalışmazsa yedek API dene
-    if not sonuclar:
-        sonuclar = await altin_yedek_api()
+    for isim, anahtar in hedefler.items():
+        if anahtar in veri:
+            alis  = veri[anahtar].get("Alış", "?")
+            satis = veri[anahtar].get("Satış", "?")
+            sonuclar[isim] = {"alis": alis, "satis": satis}
 
     return sonuclar
 
 
-async def altin_yedek_api():
-    """Yedek: collectapi.com altın endpoint (ücretsiz tier)"""
-    url = "https://api.collectapi.com/economy/goldPrice"
-    # Ücretsiz ve API key gerektirmeyen alternatif
-    url2 = "https://finans.truncgil.com/today.json"
-    
-    hedef_map = {
-        "gram-altin":      "Gram Altın",
-        "ceyrek-altin":    "Çeyrek Altın",
-        "yarim-altin":     "Yarım Altın",
-        "tam-altin":       "Tam Altın",
-        "altin-ons":       "Altın ONS (USD)",
-    }
-
-    sonuclar = {}
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url2) as resp:
-                if resp.status == 200:
-                    veri = await resp.json(content_type=None)
-                    for anahtar, gosterim in hedef_map.items():
-                        if anahtar in veri:
-                            alis  = veri[anahtar].get("Alış", "?")
-                            satis = veri[anahtar].get("Satış", "?")
-                            sonuclar[gosterim] = {"alis": alis, "satis": satis}
-    except Exception:
-        pass
-
-    return sonuclar
-
-
-def embed_olustur(fiyatlar: dict) -> discord.Embed:
+def embed_olustur(fiyatlar):
     embed = discord.Embed(
         title="🥇 Güncel Altın Fiyatları",
         color=0xFFD700,
@@ -121,42 +64,19 @@ def embed_olustur(fiyatlar: dict) -> discord.Embed:
             inline=True,
         )
 
-    embed.set_footer(text="Kaynak: bigpara.hurriyet.com.tr | Fiyatlar bilgi amaçlıdır.")
+    embed.set_footer(text="Kaynak: finans.truncgil.com | Fiyatlar bilgi amaçlıdır.")
     return embed
 
 
 @bot.event
 async def on_ready():
-    print(f"✅ Bot açıldı: {bot.user} (ID: {bot.user.id})")
-    print(f"   Komut prefix: {PREFIX}")
-    print("   Komutlar: !altin  |  !altin yardim")
+    print(f"✅ Bot açıldı: {bot.user}")
 
 
 @bot.command(name="altin", aliases=["gold", "fiyat"])
-async def altin_komutu(ctx, alt: str = None):
-    """Altın fiyatlarını gösterir. Kullanım: !altin"""
-
-    if alt == "yardim":
-        yardim = discord.Embed(
-            title="📖 Yardım",
-            description=(
-                "**!altin** → Tüm altın fiyatlarını gösterir\n"
-                "**!altin yardim** → Bu yardım mesajını gösterir\n\n"
-                "Kısayollar: `!gold`, `!fiyat`"
-            ),
-            color=0xFFD700,
-        )
-        await ctx.send(embed=yardim)
-        return
-
-    # Yükleniyor mesajı
+async def altin_komutu(ctx):
     yukle = await ctx.send("⏳ Fiyatlar alınıyor...")
-
-    try:
-        fiyatlar = await asyncio.wait_for(altin_fiyatlari_cek(), timeout=10)
-    except asyncio.TimeoutError:
-        fiyatlar = None
-
+    fiyatlar = await altin_fiyatlari_cek()
     embed = embed_olustur(fiyatlar)
     await yukle.edit(content=None, embed=embed)
 
