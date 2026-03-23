@@ -13,14 +13,16 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
 
 async def altin_fiyatlari_cek():
-    url = "https://api.genelpara.com/embed/altin.json"
+    url = "https://api.genelpara.com/json/?list=altin&sembol=GA,C,Y,T,GAG,XAUUSD"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
+        async with session.get(url, headers=headers) as resp:
             if resp.status != 200:
                 return None
             veri = await resp.json(content_type=None)
 
-    # GA=Gram, C=Çeyrek, Y=Yarım, T=Tam, GAG=Has Altın, XAUUSD=ONS
     hedefler = {
         "Gram Altın":      "GA",
         "Çeyrek Altın":    "C",
@@ -37,7 +39,7 @@ async def altin_fiyatlari_cek():
             satis = veri[anahtar].get("satis", "?")
             sonuclar[isim] = {"alis": alis, "satis": satis}
 
-    return sonuclar
+    return sonuclar if sonuclar else None
 
 
 def embed_olustur(fiyatlar):
@@ -61,7 +63,6 @@ def embed_olustur(fiyatlar):
 
     for isim, deger in fiyatlar.items():
         emoji = emojiler.get(isim, "•")
-        # ONS için $ işareti, diğerleri için ₺
         para_birimi = "$" if "USD" in isim else "₺"
         embed.add_field(
             name=f"{emoji} {isim}",
