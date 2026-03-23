@@ -13,26 +13,28 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
 
 async def altin_fiyatlari_cek():
-    url = "https://finans.truncgil.com/today.json"
+    url = "https://api.genelpara.com/embed/altin.json"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             if resp.status != 200:
                 return None
             veri = await resp.json(content_type=None)
 
+    # GA=Gram, C=Çeyrek, Y=Yarım, T=Tam, GAG=Has Altın, XAUUSD=ONS
     hedefler = {
-        "Gram Altın":      "gram-altin",
-        "Çeyrek Altın":    "ceyrek-altin",
-        "Yarım Altın":     "yarim-altin",
-        "Tam Altın":       "tam-altin",
-        "Altın ONS (USD)": "altin-ons",
+        "Gram Altın":      "GA",
+        "Çeyrek Altın":    "C",
+        "Yarım Altın":     "Y",
+        "Tam Altın":       "T",
+        "Has Altın":       "GAG",
+        "Altın ONS (USD)": "XAUUSD",
     }
 
     sonuclar = {}
     for isim, anahtar in hedefler.items():
         if anahtar in veri:
-            alis  = veri[anahtar].get("Alış", "?")
-            satis = veri[anahtar].get("Satış", "?")
+            alis  = veri[anahtar].get("alis", "?")
+            satis = veri[anahtar].get("satis", "?")
             sonuclar[isim] = {"alis": alis, "satis": satis}
 
     return sonuclar
@@ -49,6 +51,7 @@ def embed_olustur(fiyatlar):
         "Çeyrek Altın":    "🔹",
         "Yarım Altın":     "💛",
         "Tam Altın":       "🏆",
+        "Has Altın":       "✨",
         "Altın ONS (USD)": "🌍",
     }
 
@@ -58,13 +61,15 @@ def embed_olustur(fiyatlar):
 
     for isim, deger in fiyatlar.items():
         emoji = emojiler.get(isim, "•")
+        # ONS için $ işareti, diğerleri için ₺
+        para_birimi = "$" if "USD" in isim else "₺"
         embed.add_field(
             name=f"{emoji} {isim}",
-            value=f"Alış: **{deger['alis']} ₺**\nSatış: **{deger['satis']} ₺**",
+            value=f"Alış: **{deger['alis']} {para_birimi}**\nSatış: **{deger['satis']} {para_birimi}**",
             inline=True,
         )
 
-    embed.set_footer(text="Kaynak: finans.truncgil.com | Fiyatlar bilgi amaçlıdır.")
+    embed.set_footer(text="Kaynak: genelpara.com | Fiyatlar bilgi amaçlıdır.")
     return embed
 
 
