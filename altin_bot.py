@@ -13,7 +13,7 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
 
 async def altin_fiyatlari_cek():
-    url = "https://api.genelpara.com/json/?list=altin&sembol=GA,C,Y,T,GAG,XAUUSD"
+    url = "https://finans.truncgil.com/v4/today.json"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
@@ -23,20 +23,21 @@ async def altin_fiyatlari_cek():
                 return None
             veri = await resp.json(content_type=None)
 
+    # v4 API anahtarları
     hedefler = {
-        "Gram Altın":      "GA",
-        "Çeyrek Altın":    "C",
-        "Yarım Altın":     "Y",
-        "Tam Altın":       "T",
-        "Has Altın":       "GAG",
-        "Altın ONS (USD)": "XAUUSD",
+        "Gram Altın":      "gram-altin",
+        "Çeyrek Altın":    "ceyrek-altin",
+        "Yarım Altın":     "yarim-altin",
+        "Tam Altın":       "tam-altin",
+        "Has Altın":       "has-altin",
+        "Altın ONS (USD)": "altin-ons",
     }
 
     sonuclar = {}
     for isim, anahtar in hedefler.items():
         if anahtar in veri:
-            alis  = veri[anahtar].get("alis", "?")
-            satis = veri[anahtar].get("satis", "?")
+            alis  = veri[anahtar].get("Alış", veri[anahtar].get("alis", "?"))
+            satis = veri[anahtar].get("Satış", veri[anahtar].get("satis", "?"))
             sonuclar[isim] = {"alis": alis, "satis": satis}
 
     return sonuclar if sonuclar else None
@@ -70,7 +71,7 @@ def embed_olustur(fiyatlar):
             inline=True,
         )
 
-    embed.set_footer(text="Kaynak: genelpara.com | Fiyatlar bilgi amaçlıdır.")
+    embed.set_footer(text="Kaynak: finans.truncgil.com | Fiyatlar bilgi amaçlıdır.")
     return embed
 
 
